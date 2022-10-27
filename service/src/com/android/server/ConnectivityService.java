@@ -6357,6 +6357,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
             final boolean curMetered = nai.networkCapabilities.isMetered();
             maybeNotifyNetworkBlocked(nai, curMetered, curMetered,
                     mVpnBlockedUidRanges, newVpnBlockedUidRanges);
+
+            if (nai.isVPN()) {
+                updateVpnFiltering(nai.linkProperties, nai.linkProperties, nai, true /* force */);
+            }
         }
 
         mVpnBlockedUidRanges = newVpnBlockedUidRanges;
@@ -7848,7 +7852,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         // update filtering rules, need to happen after the interface update so netd knows about the
         // new interface (the interface name -> index map becomes initialized)
-        updateVpnFiltering(newLp, oldLp, networkAgent);
+        updateVpnFiltering(newLp, oldLp, networkAgent, false /* force */);
 
         updateMtu(newLp, oldLp);
         // TODO - figure out what to do for clat
@@ -8116,7 +8120,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     }
 
     private void updateVpnFiltering(LinkProperties newLp, LinkProperties oldLp,
-            NetworkAgentInfo nai) {
+            NetworkAgentInfo nai, boolean force) {
         final String oldIface = getVpnIsolationInterface(nai, nai.networkCapabilities, oldLp);
         final String newIface = getVpnIsolationInterface(nai, nai.networkCapabilities, newLp);
         final boolean wasFiltering = requiresVpnAllowRule(nai, oldLp, oldIface);
@@ -8127,7 +8131,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return;
         }
 
-        if (Objects.equals(oldIface, newIface) && (wasFiltering == needsFiltering)) {
+        if (!force && Objects.equals(oldIface, newIface) && (wasFiltering == needsFiltering)) {
             // Nothing changed.
             return;
         }
@@ -8148,9 +8152,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // by overriding the Lockdown blocking rule.
         if (wasFiltering) {
             mPermissionMonitor.onVpnUidRangesRemoved(oldIface, ranges, vpnAppUid);
+            mPermissionMonitor.updateVpnLockdownUidInterfaceRules(oldLp.getInterfaceName(), ranges,
+                    vpnAppUid, false /* add */);
         }
         if (needsFiltering) {
             mPermissionMonitor.onVpnUidRangesAdded(newIface, ranges, vpnAppUid);
+            mPermissionMonitor.updateVpnLockdownUidInterfaceRules(newLp.getInterfaceName(), ranges,
+                    vpnAppUid, true /* add */);
         }
     }
 
@@ -8629,9 +8637,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
             if (wasFiltering && !prevRanges.isEmpty()) {
                 mPermissionMonitor.onVpnUidRangesRemoved(oldIface, prevRanges,
                         prevNc.getOwnerUid());
+                mPermissionMonitor.updateVpnLockdownUidInterfaceRules(
+                        nai.linkProperties.getInterfaceName(), prevRanges, prevNc.getOwnerUid(),
+                        false /* add */);
             }
             if (shouldFilter && !newRanges.isEmpty()) {
                 mPermissionMonitor.onVpnUidRangesAdded(newIface, newRanges, newNc.getOwnerUid());
+                mPermissionMonitor.updateVpnLockdownUidInterfaceRules(
+                        nai.linkProperties.getInterfaceName(), newRanges, newNc.getOwnerUid(),
+                        true /* add */);
             }
         } catch (Exception e) {
             // Never crash!
