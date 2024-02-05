@@ -245,7 +245,4 @@ interface IConnectivityManager
     void setFirewallChainEnabled(int chain, boolean enable);
 
     void replaceFirewallChain(int chain, in int[] uids);
-
-    void setUidsAllowedTransports(in int[] uids, in long[] allowedTransportsPacked);
-    boolean isUidCurrentlyDisallowedByPolicy(int uid);
 }
