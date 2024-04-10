@@ -176,8 +176,10 @@ int main(int argc, char** argv, char * const envp[]) {
     const int device_api_level = android_get_device_api_level();
     const bool isAtLeastU = (device_api_level >= __ANDROID_API_U__);
 
-    if (!android::bpf::isAtLeastKernelVersion(4, 19, 0)) {
-        ALOGW("Android U QPR2 requires kernel 4.19.");
+    if (!android::bpf::isAtLeastKernelVersion(4, 19, 0) &&
+        android::bpf::isAtLeastKernelVersion(4, 14, 0)) {
+        ALOGE("Android U QPR2 requires kernel 4.19.");
+        return 1;
     }
 
     if (android::bpf::isUserspace32bit() && android::bpf::isAtLeastKernelVersion(6, 2, 0)) {
